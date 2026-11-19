@@ -297,7 +297,7 @@
             <span class="new-best" id="newBest" hidden>🏆 رقم قياسي جديد!</span>
             <p id="overMsg">محاولة حلوة… الصبّار كان أسرع المرة دي.</p>
             <button class="btn btn-primary" id="retryBtn" type="button">↻ العب تاني</button>
-            <button class="btn btn-ghost" id="sendScoreBtn" type="button" hidden>📤 احفظ نتيجتي في ترتيب البوت</button>
+            <p id="sendStatus" hidden>⏳ ببعت نتيجتك للبوت...</p>
           </div>
 
           <div class="overlay" id="pauseOverlay" hidden>
@@ -339,15 +339,31 @@
         var tg = (window.Telegram && window.Telegram.WebApp) ? window.Telegram.WebApp : null;
         var inTelegram = !!(tg && tg.initData);
         var scoreSent = false;
+        var sendTimer = null;
         if (tg) {
           try { tg.ready(); tg.expand(); } catch (e) {}
         }
         function sendScoreToBot() {
           if (!tg || !tg.sendData || scoreSent) return;
           scoreSent = true;
+          var st = document.getElementById('sendStatus');
+          if (st) st.hidden = true;
           try {
             tg.sendData(JSON.stringify({ game: 'dino', score: Math.floor(score), best: Math.floor(best) }));
           } catch (e) {}
+        }
+        /* النتيجة بتتبعت لوحدها بعد ثانية من الخسارة — ولو اللاعب داس «العب تاني» قبلها بتتلغي */
+        function scheduleAutoSend() {
+          if (!inTelegram) return;
+          cancelAutoSend();
+          var st = document.getElementById('sendStatus');
+          if (st) st.hidden = false;
+          sendTimer = setTimeout(sendScoreToBot, 1000);
+        }
+        function cancelAutoSend() {
+          if (sendTimer) { clearTimeout(sendTimer); sendTimer = null; }
+          var st = document.getElementById('sendStatus');
+          if (st) st.hidden = true;
         }
 
         var canvas = document.getElementById('game');
@@ -539,6 +555,7 @@
 
         function startGame() {
           reset();
+          cancelAutoSend();
           scoreSent = false;
           state = 'running';
           hideOverlays();
@@ -560,8 +577,8 @@
           ];
           document.getElementById('overMsg').textContent = msgs[Math.floor(Math.random() * msgs.length)];
           document.getElementById('chipBest').textContent = pad(best);
-          document.getElementById('sendScoreBtn').hidden = !inTelegram;
           showOverlay('overOverlay');
+          scheduleAutoSend();
         }
 
         function doJump() {
@@ -794,7 +811,6 @@
         /* ---------------- input ---------------- */
         document.getElementById('startBtn').addEventListener('click', startGame);
         document.getElementById('retryBtn').addEventListener('click', startGame);
-        document.getElementById('sendScoreBtn').addEventListener('click', sendScoreToBot);
         document.getElementById('resumeBtn').addEventListener('click', togglePause);
         document.getElementById('pauseBtn').addEventListener('click', function () {
           if (state === 'running' || state === 'paused') togglePause();
